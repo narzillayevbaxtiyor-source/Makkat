@@ -1,55 +1,75 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { getMyProfile } from "../lib/api";
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
-const AuthCtx = createContext(null);
+const AuthContext = createContext({});
 
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const refreshProfile = async () => {
-    const p = await getMyProfile().catch(() => null);
-    setProfile(p);
+  const fetchProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (data) setProfile(data);
+    } catch (e) {
+      console.error("Profile fetch error:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session) await refreshProfile();
+    // Joriy sessiyani olish
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session) await refreshProfile();
-      else setProfile(null);
+    // Realtime auth holati o'zgarishini tinglash
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
-    return () => sub.subscription.unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithGoogle = async () => {
+  const loginWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
     });
-    return { error };
+    if (error) alert("Kirishda xatolik: " + error.message);
   };
 
-  const signInWithPassword = async (email, password) => {
-    return supabase.auth.signInWithPassword({ email, password });
-  };
-
-  const signOut = async () => {
+  const logout = async () => {
     await supabase.auth.signOut();
+    setUser(null);
     setProfile(null);
   };
 
   return (
-    <AuthCtx.Provider value={{ session, profile, refreshProfile, signInWithGoogle, signInWithPassword, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, loginWithGoogle, logout }}>
       {children}
-    </AuthCtx.Provider>
+    </AuthContext.Provider>
   );
-}
+};
 
-export const useAuth = () => useContext(AuthCtx);
+export const useAuth = () => useContext(AuthContext);
