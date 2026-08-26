@@ -30,7 +30,7 @@ export function Landing({ lang, setLang, t }) {
         <h1 className="text-[26px] font-bold text-center text-[#221F17] leading-tight mb-2">{t.routeName}</h1>
         <p className="text-center text-[#6B6656] text-[15px] mb-10">{t.tagline}</p>
         <div className="space-y-3 max-w-sm mx-auto w-full">
-          <Btn onClick={() => nav(user ? "/book" : "/book")}><Car size={18} />{t.bookRide}</Btn>
+          <Btn onClick={() => nav(session ? "/book" : "/login")}><Car size={18} />{t.bookRide}</Btn>
           <Btn variant="secondary" onClick={() => nav("/driver/register")}><User size={18} />{t.becomeDriver}</Btn>
         </div>
       </div>
